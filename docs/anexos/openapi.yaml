@@ -1,0 +1,276 @@
+openapi: 3.0.3
+info:
+  title: API Control de Presupuesto de Prevención
+  version: 1.0.0
+  description: >
+    Contrato OpenAPI 3.1.0 para la gestión presupuestal de prevención (SST),
+    gobernado por Apigee X sobre backend reactivo Spring WebFlux.
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Servidor local de desarrollo (Spring WebFlux)
+
+security:
+  - bearerAuth: []
+
+paths:
+  /planes-trabajo/{planTrabajoId}/ordenes-servicio:
+    post:
+      summary: Planear orden de servicio y reservar presupuesto (HU-1)
+      operationId: planearOrdenServicio
+      tags:
+        - OrdenesServicio
+      parameters:
+        - name: planTrabajoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanearOrdenRequest'
+      responses:
+        '201':
+          description: Orden planeada y saldo reservado (RN-01, RN-02, RN-05)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdenServicioResponse'
+        '403':
+          description: Rol sin permisos o empresa fuera de grupo (CB-03)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocio'
+        '422':
+          description: Regla de negocio infringida, ej. saldo insuficiente RN-01 (CB-02)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocio'
+
+  /ordenes-servicio/{ordenServicioId}/ejecutar:
+    patch:
+      summary: Registrar ejecución en campo y consumir presupuesto (HU-2)
+      operationId: ejecutarOrdenServicio
+      tags:
+        - OrdenesServicio
+      parameters:
+        - name: ordenServicioId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Orden ejecutada; saldo comprometido pasa a ejecutado (RN-06)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdenServicioResponse'
+        '409':
+          description: Conflicto de estado, la orden ya fue cancelada o ejecutada (CB-05)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocio'
+
+  /ordenes-servicio/{ordenServicioId}/cancelar:
+    patch:
+      summary: Cancelar orden de servicio y liberar presupuesto (HU-2)
+      operationId: cancelarOrdenServicio
+      tags:
+        - OrdenesServicio
+      parameters:
+        - name: ordenServicioId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Orden cancelada; saldo comprometido regresa a disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdenServicioResponse'
+        '409':
+          description: Conflicto de estado o intento sobre orden ya ejecutada (RN-06, CB-05)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocio'
+
+  /empresas-afiliadas/{empresaAfiliadaId}/presupuesto:
+    get:
+      summary: Consultar estado presupuestal por empresa afiliada (HU-3)
+      operationId: consultarPresupuestoEmpresa
+      tags:
+        - Presupuesto
+      parameters:
+        - name: empresaAfiliadaId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: vigencia
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 2026
+      responses:
+        '200':
+          description: Desglose financiero vigente de la empresa afiliada (RN-03)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresupuestoEmpresaResponse'
+        '403':
+          description: Empresa fuera del grupo asignado al Líder (RN-09, CB-03)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocio'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: X-Idempotency-Key
+      in: header
+      required: true
+      description: Identificador único de operación para evitar duplicados (CB-01)
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    PlanearOrdenRequest:
+      type: object
+      required:
+        - prestadorId
+        - fechaProgramada
+        - serviciosPrevencion
+      properties:
+        prestadorId:
+          type: string
+          format: uuid
+        fechaProgramada:
+          type: string
+          format: date
+          example: '2026-12-05'
+        serviciosPrevencion:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - codigo
+              - nombre
+              - valor
+            properties:
+              codigo:
+                type: string
+                example: CAP-ALT-01
+              nombre:
+                type: string
+                example: Capacitación trabajo en alturas
+              valor:
+                type: number
+                format: double
+                minimum: 0.01
+                example: 1500000
+
+    OrdenServicioResponse:
+      type: object
+      properties:
+        ordenServicioId:
+          type: string
+          format: uuid
+        estado:
+          type: string
+          enum: [PLANEADA, EJECUTADA, CANCELADA]
+        valorTotal:
+          type: number
+          format: double
+          example: 2500000
+        resumenPresupuesto:
+          $ref: '#/components/schemas/ResumenPresupuesto'
+
+    ResumenPresupuesto:
+      type: object
+      properties:
+        saldoDisponible:
+          type: number
+          format: double
+          example: 3500000
+        saldoComprometido:
+          type: number
+          format: double
+          example: 6500000
+        saldoEjecutado:
+          type: number
+          format: double
+          example: 1000000
+
+    PresupuestoEmpresaResponse:
+      type: object
+      properties:
+        empresaAfiliadaId:
+          type: string
+          format: uuid
+        razonSocial:
+          type: string
+          example: Textiles S.A.
+        vigencia:
+          type: integer
+          example: 2026
+        presupuestoAnual:
+          type: number
+          format: double
+          example: 20000000
+        saldoComprometido:
+          type: number
+          format: double
+          example: 7000000
+        saldoEjecutado:
+          type: number
+          format: double
+          example: 5000000
+        saldoDisponible:
+          type: number
+          format: double
+          example: 8000000
+
+    ErrorNegocio:
+      type: object
+      properties:
+        codigoRegla:
+          type: string
+          example: RN-01
+        error:
+          type: string
+          example: SALDO_INSUFICIENTE
+        mensaje:
+          type: string
+          example: El valor de la Orden de servicio supera el Saldo disponible actual de la Empresa afiliada.
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-11-20T19:05:00-05:00'
