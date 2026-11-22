@@ -118,18 +118,21 @@ stateDiagram-v2
 ### 5.1 Endpoints Core (Apigee X → Spring WebFlux)
 La especificación completa de esquemas, códigos HTTP y ejemplos se encuentra desacoplada en el contrato [openapi.yaml](./anexos/openapi.yaml). Todas las peticiones exigen `Authorization: Bearer <jwt>` y las mutables requieren `X-Idempotency-Key` (`CB-01`).
 
-| HU | Caso de Uso | Método y Ruta | Rol Autorizado |
+| Historia / HT | Caso de Uso / Acción | Método y Ruta | Rol Autorizado |
 | :--- | :--- | :--- | :--- |
-| **HU-1** | `planearOrdenServicio()` | `POST /api/v1/planes-trabajo/{planTrabajoId}/ordenes-servicio` | `ProfesionalPrevencion` |
-| **HU-2** | Ejecutar orden en campo | `PATCH /api/v1/ordenes-servicio/{ordenServicioId}/ejecutar` | `Prestador` |
-| **HU-2** | `cancelarOrdenServicio()` | `PATCH /api/v1/ordenes-servicio/{ordenServicioId}/cancelar` | `ProfesionalPrevencion` |
-| **HU-3** | Consultar saldos empresa | `GET /api/v1/empresas-afiliadas/{empresaAfiliadaId}/presupuesto` | `LiderPrevencion` |
+| **HT-002** | `asignarPresupuestoAnual()` | `POST /api/v1/empresas-afiliadas/{empresaAfiliadaId}/presupuestos` | `LiderPrevencion` |
+| **HU-3 / HT-010** | Consultar saldos empresa | `GET /api/v1/empresas-afiliadas/{empresaAfiliadaId}/presupuesto` | `LiderPrevencion` |
+| **HT-010** | Consultar plan de trabajo propio | `GET /api/v1/planes-trabajo/mi-empresa` | `RepresentanteSST` |
+| **HT-010** | Solicitar servicios de prevención | `POST /api/v1/planes-trabajo/mi-empresa/solicitudes` | `RepresentanteSST` |
+| **HU-1 / HT-012** | `planearOrdenServicio()` | `POST /api/v1/planes-trabajo/{planTrabajoId}/ordenes-servicio` | `ProfesionalPrevencion` |
+| **HU-2 / HT-009** | Ejecutar orden en campo | `PATCH /api/v1/ordenes-servicio/{ordenServicioId}/ejecutar` | `Prestador` |
+| **HU-2 / HT-009** | `cancelarOrdenServicio()` | `PATCH /api/v1/ordenes-servicio/{ordenServicioId}/cancelar` | `ProfesionalPrevencion` |
+| **HT-004 / HT-013** | Registrar evaluación y `reajustarPlanTrabajo()` | `POST /api/v1/ordenes-servicio/{ordenServicioId}/evaluaciones` | `ProfesionalPrevencion` |
 
 ### 5.2 Errores de Negocio (`CB-02`) y Seguridad RBAC (`RN-08`, `RN-09`, `RN-10`)
-* **Formato estándar de error:** Cualquier infracción a las reglas (`RN-01` a `RN-10`) responde bajo **RFC 7807** (`422`, `403` o `409`) devolviendo `codigoRegla`, `error`, `mensaje` y `timestamp` en lenguaje de negocio, sin exponer trazas técnicas.
-- **Propagación pura de identidad (`ContextoUsuario`):** Spring Security WebFlux valida el rol contra la ruta en los *entry-points* y mapea los *claims* del JWT (`usuarioId`, `rol`, `grupoPrevencionId`) hacia un objeto puro `ContextoUsuario`, evitando dependencias de seguridad dentro de `domain/usecase`.
-- **Propiedad y aislamiento de datos (`RN-09`, `CB-03`):** En `HU-2`, el caso de uso verifica que el `usuarioId` del `Prestador` coincida con el `prestador_id` asignado a la `OrdenServicio`. En `HU-3`, el adaptador R2DBC filtra obligatoriamente por `grupo_prevencion_id` para el `LiderPrevencion`, negando con `403 Forbidden` cualquier consulta sobre empresas de otro grupo sin revelar sus saldos.
-* **Aislamiento por grupo (`RN-09`, `CB-03`):** Spring Security WebFlux extrae `grupoPrevencionId` del JWT y el adaptador R2DBC filtra obligatoriamente por ese grupo en las consultas de un `LiderPrevencion`, negando el acceso sin revelar saldos de empresas ajenas.
+* **Formato estándar de error:** Cualquier infracción a las reglas (`RN-01` a `RN-10`) responde bajo **RFC 7807** (`application/problem+json` con códigos `422`, `403` o `409`) devolviendo los campos estándar (`type`, `title`, `status`, `detail`, `instance`) junto con `codigoRegla`, `error` y `timestamp` en lenguaje de negocio, sin exponer trazas técnicas.
+* **Propagación pura de identidad (`ContextoUsuario`):** Spring Security WebFlux valida el rol contra la ruta en los *entry-points* y mapea los *claims* del JWT (`usuarioId`, `rol`, `grupoPrevencionId`) hacia un objeto puro `ContextoUsuario`, evitando dependencias de seguridad dentro de `domain/usecase`.
+* **Propiedad y aislamiento de datos (`RN-09`, `CB-03`):** En `HU-2`, el caso de uso verifica que el `usuarioId` del `Prestador` coincida con el `prestador_id` asignado a la `OrdenServicio`. En `HU-3` y `HT-002`, el adaptador R2DBC filtra obligatoriamente por `grupo_prevencion_id` para el `LiderPrevencion`, negando con `403 Forbidden` cualquier operación sobre empresas de otro grupo sin revelar sus saldos. Para `RepresentanteSST` (`HT-010`), las consultas y solicitudes se restringen estrictamente a su `empresaAfiliadaId` asociada en el token.
 
 ---
 

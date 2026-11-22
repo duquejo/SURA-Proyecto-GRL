@@ -1,10 +1,11 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: API Control de Presupuesto de Prevención
   version: 1.0.0
   description: >
-    Contrato OpenAPI 3.1.0 para la gestión presupuestal de prevención (SST),
-    gobernado por Apigee X sobre backend reactivo Spring WebFlux.
+    Contrato OpenAPI 3.1.0 para la gestión presupuestal de prevención (ARL),
+    gobernado por Apigee X sobre backend reactivo Spring WebFlux y consumido
+    por la SPA en Angular.
 
 servers:
   - url: http://localhost:8080/api/v1
@@ -13,20 +14,151 @@ servers:
 security:
   - bearerAuth: []
 
+tags:
+  - name: Presupuesto
+    description: Asignación y consulta de Presupuesto anual por Empresa afiliada
+  - name: PlanesTrabajo
+    description: Consulta de Plan de trabajo y solicitudes del Representante SST
+  - name: OrdenesServicio
+    description: Planeación, ejecución en campo y cancelación de Órdenes de servicio
+  - name: EvaluacionesRiesgo
+    description: Registro de Evaluación de riesgo y reajuste de Plan de trabajo
+
 paths:
+  /empresas-afiliadas/{empresaAfiliadaId}/presupuestos:
+    post:
+      summary: Asignar o ajustar presupuesto anual por empresa afiliada (HT-002 / RN-10)
+      operationId: asignarPresupuestoAnual
+      tags:
+        - Presupuesto
+      parameters:
+        - $ref: '#/components/parameters/EmpresaAfiliadaIdPath'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AsignarPresupuestoRequest'
+      responses:
+        '201':
+          description: Presupuesto anual asignado o ajustado para la vigencia (RN-03, RN-10)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresupuestoEmpresaResponse'
+        '403':
+          description: Rol distinto a LiderPrevencion o empresa fuera de su grupo asignado (RN-09, RN-10, CB-03)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
+        '422':
+          description: Regla de negocio infringida, ej. monto menor al saldo ya comprometido/ejecutado o vigencia inválida (RN-03, CB-02)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
+
+  /empresas-afiliadas/{empresaAfiliadaId}/presupuesto:
+    get:
+      summary: Consultar estado presupuestal por empresa afiliada (HU-3 / HT-010)
+      operationId: consultarPresupuestoEmpresa
+      tags:
+        - Presupuesto
+      parameters:
+        - $ref: '#/components/parameters/EmpresaAfiliadaIdPath'
+        - name: vigencia
+          in: query
+          required: true
+          description: Año fiscal de consulta (RN-03)
+          schema:
+            type: integer
+            example: 2026
+      responses:
+        '200':
+          description: Desglose financiero vigente de la Empresa afiliada (RN-03)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresupuestoEmpresaResponse'
+        '403':
+          description: Empresa fuera del grupo asignado al Líder en prevención (RN-09, CB-03)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
+
+  /planes-trabajo/mi-empresa:
+    get:
+      summary: Consultar plan de trabajo de la empresa del Representante SST (HT-010)
+      operationId: consultarPlanTrabajoMiEmpresa
+      tags:
+        - PlanesTrabajo
+      parameters:
+        - name: vigencia
+          in: query
+          required: true
+          description: Año fiscal del Plan de trabajo
+          schema:
+            type: integer
+            example: 2026
+      responses:
+        '200':
+          description: Plan de trabajo vigente y listado de Órdenes de servicio de la Empresa afiliada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanTrabajoResponse'
+        '403':
+          description: Rol no autorizado para consultar el plan propio de empresa (CB-03)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
+
+  /planes-trabajo/mi-empresa/solicitudes:
+    post:
+      summary: Solicitar nuevos servicios de prevención por Representante SST (HT-010)
+      operationId: solicitarServiciosPrevencion
+      tags:
+        - PlanesTrabajo
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitarServicioRequest'
+      responses:
+        '201':
+          description: Solicitud de servicios registrada para gestión del Profesional de prevención
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudServicioResponse'
+        '403':
+          description: Rol distinto a RepresentanteSST (CB-03)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
+        '422':
+          description: Regla de negocio infringida sobre el Plan de trabajo vigente (CB-02)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
+
   /planes-trabajo/{planTrabajoId}/ordenes-servicio:
     post:
-      summary: Planear orden de servicio y reservar presupuesto (HU-1)
+      summary: Planear orden de servicio y reservar presupuesto (HU-1 / HT-012)
       operationId: planearOrdenServicio
       tags:
         - OrdenesServicio
       parameters:
-        - name: planTrabajoId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: '#/components/parameters/PlanTrabajoIdPath'
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
@@ -36,112 +168,122 @@ paths:
               $ref: '#/components/schemas/PlanearOrdenRequest'
       responses:
         '201':
-          description: Orden planeada y saldo reservado (RN-01, RN-02, RN-05)
+          description: Orden planeada, saldo reservado y Plan de trabajo en EN_EJECUCION (RN-01, RN-02, RN-05)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrdenServicioResponse'
         '403':
-          description: Rol sin permisos o empresa fuera de grupo (CB-03)
+          description: Rol distinto a ProfesionalPrevencion o empresa fuera de grupo (CB-03)
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorNegocio'
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
         '422':
-          description: Regla de negocio infringida, ej. saldo insuficiente RN-01 (CB-02)
+          description: Saldo disponible insuficiente (RN-01) o empresa sin Presupuesto anual asignado (CB-06)
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorNegocio'
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
 
   /ordenes-servicio/{ordenServicioId}/ejecutar:
     patch:
-      summary: Registrar ejecución en campo y consumir presupuesto (HU-2)
+      summary: Registrar ejecución en campo y consumir presupuesto (HU-2 / HT-009)
       operationId: ejecutarOrdenServicio
       tags:
         - OrdenesServicio
       parameters:
-        - name: ordenServicioId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: '#/components/parameters/OrdenServicioIdPath'
         - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
-          description: Orden ejecutada; saldo comprometido pasa a ejecutado (RN-06)
+          description: Orden ejecutada de forma irreversible; saldo comprometido pasa a ejecutado (RN-05, RN-06)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrdenServicioResponse'
-        '409':
-          description: Conflicto de estado, la orden ya fue cancelada o ejecutada (CB-05)
+        '403':
+          description: Rol distinto a Prestador o usuario no corresponde al prestador asignado a la orden (CB-03)
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorNegocio'
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
+        '409':
+          description: Conflicto de estado; la orden ya fue cancelada o ejecutada previamente (CB-05)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
 
   /ordenes-servicio/{ordenServicioId}/cancelar:
     patch:
-      summary: Cancelar orden de servicio y liberar presupuesto (HU-2)
+      summary: Cancelar orden de servicio y liberar presupuesto (HU-2 / HT-009)
       operationId: cancelarOrdenServicio
       tags:
         - OrdenesServicio
       parameters:
-        - name: ordenServicioId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: '#/components/parameters/OrdenServicioIdPath'
         - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
-          description: Orden cancelada; saldo comprometido regresa a disponible
+          description: Orden cancelada; 100% del saldo comprometido regresa a disponible (RN-02)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrdenServicioResponse'
-        '409':
-          description: Conflicto de estado o intento sobre orden ya ejecutada (RN-06, CB-05)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorNegocio'
-
-  /empresas-afiliadas/{empresaAfiliadaId}/presupuesto:
-    get:
-      summary: Consultar estado presupuestal por empresa afiliada (HU-3)
-      operationId: consultarPresupuestoEmpresa
-      tags:
-        - Presupuesto
-      parameters:
-        - name: empresaAfiliadaId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - name: vigencia
-          in: query
-          required: true
-          schema:
-            type: integer
-            example: 2026
-      responses:
-        '200':
-          description: Desglose financiero vigente de la empresa afiliada (RN-03)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PresupuestoEmpresaResponse'
         '403':
-          description: Empresa fuera del grupo asignado al Líder (RN-09, CB-03)
+          description: Rol distinto a ProfesionalPrevencion o empresa fuera de grupo (CB-03)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
+        '409':
+          description: Conflicto de estado o intento de cancelar una orden ya ejecutada (RN-06, CB-05)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
+
+  /ordenes-servicio/{ordenServicioId}/evaluaciones:
+    post:
+      summary: Registrar evaluación de riesgo y definir cierre o reajuste de plan (HT-004 / HT-013)
+      operationId: registrarEvaluacionRiesgo
+      tags:
+        - EvaluacionesRiesgo
+      parameters:
+        - $ref: '#/components/parameters/OrdenServicioIdPath'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrarEvaluacionRiesgoRequest'
+      responses:
+        '201':
+          description: Evaluación registrada; cierra el Plan de trabajo o lo devuelve a EN_PLANEACION (RN-07, RN-08)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorNegocio'
+                $ref: '#/components/schemas/EvaluacionRiesgoResponse'
+        '403':
+          description: Rol distinto a ProfesionalPrevencion o empresa fuera de grupo (RN-08, CB-03)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
+        '409':
+          description: La Orden de servicio aún no se encuentra en estado EJECUTADA (CB-02)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
+        '422':
+          description: Regla de negocio infringida en la evaluación de riesgo (CB-02)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorNegocioRFC7807'
 
 components:
   securitySchemes:
@@ -155,12 +297,185 @@ components:
       name: X-Idempotency-Key
       in: header
       required: true
-      description: Identificador único de operación para evitar duplicados (CB-01)
+      description: Identificador único de operación (UUID) para evitar duplicados ante reintentos (CB-01)
+      schema:
+        type: string
+        format: uuid
+    EmpresaAfiliadaIdPath:
+      name: empresaAfiliadaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PlanTrabajoIdPath:
+      name: planTrabajoId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OrdenServicioIdPath:
+      name: ordenServicioId
+      in: path
+      required: true
       schema:
         type: string
         format: uuid
 
   schemas:
+    AsignarPresupuestoRequest:
+      type: object
+      required:
+        - vigencia
+        - montoAsignado
+      properties:
+        vigencia:
+          type: integer
+          minimum: 2026
+          example: 2026
+        montoAsignado:
+          type: number
+          multipleOf: 0.01
+          minimum: 0.01
+          example: 25000000
+
+    PresupuestoEmpresaResponse:
+      type: object
+      required:
+        - empresaAfiliadaId
+        - razonSocial
+        - vigencia
+        - presupuestoAnual
+        - saldoComprometido
+        - saldoEjecutado
+        - saldoDisponible
+      properties:
+        empresaAfiliadaId:
+          type: string
+          format: uuid
+        razonSocial:
+          type: string
+          example: Textiles S.A.
+        vigencia:
+          type: integer
+          example: 2026
+        presupuestoAnual:
+          type: number
+          multipleOf: 0.01
+          example: 20000000
+        saldoComprometido:
+          type: number
+          multipleOf: 0.01
+          example: 7000000
+        saldoEjecutado:
+          type: number
+          multipleOf: 0.01
+          example: 5000000
+        saldoDisponible:
+          type: number
+          multipleOf: 0.01
+          example: 8000000
+
+    PlanTrabajoResponse:
+      type: object
+      required:
+        - planTrabajoId
+        - empresaAfiliadaId
+        - vigencia
+        - estado
+        - ordenesServicio
+      properties:
+        planTrabajoId:
+          type: string
+          format: uuid
+        empresaAfiliadaId:
+          type: string
+          format: uuid
+        vigencia:
+          type: integer
+          example: 2026
+        estado:
+          type: string
+          enum: [EN_PLANEACION, EN_EJECUCION, CERRADO]
+          example: EN_EJECUCION
+        ordenesServicio:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrdenServicioResumen'
+
+    OrdenServicioResumen:
+      type: object
+      required:
+        - ordenServicioId
+        - estado
+        - fechaProgramada
+        - valorTotal
+        - serviciosPrevencion
+      properties:
+        ordenServicioId:
+          type: string
+          format: uuid
+        estado:
+          type: string
+          enum: [PLANEADA, EJECUTADA, CANCELADA]
+        fechaProgramada:
+          type: string
+          format: date
+          example: '2026-12-05'
+        valorTotal:
+          type: number
+          multipleOf: 0.01
+          example: 2500000
+        serviciosPrevencion:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServicioPrevencionItem'
+
+    SolicitarServicioRequest:
+      type: object
+      required:
+        - vigencia
+        - codigosServicios
+        - justificacion
+      properties:
+        vigencia:
+          type: integer
+          example: 2026
+        codigosServicios:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            example: CAP-ALT-01
+        justificacion:
+          type: string
+          minLength: 10
+          example: Capacitación requerida para cuadrilla de mantenimiento en alturas.
+
+    SolicitudServicioResponse:
+      type: object
+      required:
+        - solicitudId
+        - planTrabajoId
+        - estado
+        - fechaSolicitud
+      properties:
+        solicitudId:
+          type: string
+          format: uuid
+        planTrabajoId:
+          type: string
+          format: uuid
+        estado:
+          type: string
+          enum: [PENDIENTE_PLANEACION]
+          example: PENDIENTE_PLANEACION
+        fechaSolicitud:
+          type: string
+          format: date-time
+          example: '2026-11-22T11:30:00-05:00'
+
     PlanearOrdenRequest:
       type: object
       required:
@@ -179,26 +494,35 @@ components:
           type: array
           minItems: 1
           items:
-            type: object
-            required:
-              - codigo
-              - nombre
-              - valor
-            properties:
-              codigo:
-                type: string
-                example: CAP-ALT-01
-              nombre:
-                type: string
-                example: Capacitación trabajo en alturas
-              valor:
-                type: number
-                format: double
-                minimum: 0.01
-                example: 1500000
+            $ref: '#/components/schemas/ServicioPrevencionItem'
+
+    ServicioPrevencionItem:
+      type: object
+      required:
+        - codigo
+        - nombre
+        - valor
+      properties:
+        codigo:
+          type: string
+          example: CAP-ALT-01
+        nombre:
+          type: string
+          example: Capacitación trabajo en alturas
+        valor:
+          type: number
+          multipleOf: 0.01
+          minimum: 0.01
+          example: 1500000
 
     OrdenServicioResponse:
       type: object
+      required:
+        - ordenServicioId
+        - estado
+        - estadoPlanTrabajo
+        - valorTotal
+        - resumenPresupuesto
       properties:
         ordenServicioId:
           type: string
@@ -206,71 +530,113 @@ components:
         estado:
           type: string
           enum: [PLANEADA, EJECUTADA, CANCELADA]
+        estadoPlanTrabajo:
+          type: string
+          enum: [EN_PLANEACION, EN_EJECUCION, CERRADO]
+          example: EN_EJECUCION
         valorTotal:
           type: number
-          format: double
+          multipleOf: 0.01
           example: 2500000
         resumenPresupuesto:
           $ref: '#/components/schemas/ResumenPresupuesto'
 
     ResumenPresupuesto:
       type: object
+      required:
+        - saldoDisponible
+        - saldoComprometido
+        - saldoEjecutado
       properties:
         saldoDisponible:
           type: number
-          format: double
+          multipleOf: 0.01
           example: 3500000
         saldoComprometido:
           type: number
-          format: double
+          multipleOf: 0.01
           example: 6500000
         saldoEjecutado:
           type: number
-          format: double
+          multipleOf: 0.01
           example: 1000000
 
-    PresupuestoEmpresaResponse:
+    RegistrarEvaluacionRiesgoRequest:
       type: object
+      required:
+        - riesgoDisminuyo
+        - observaciones
       properties:
-        empresaAfiliadaId:
+        riesgoDisminuyo:
+          type: boolean
+          description: Indica si el riesgo de la Empresa afiliada disminuyó tras ejecutar la orden (RN-07)
+          example: false
+        observaciones:
+          type: string
+          minLength: 5
+          example: Se requiere refuerzo práctico en línea de vida; se reajusta el Plan de trabajo.
+
+    EvaluacionRiesgoResponse:
+      type: object
+      required:
+        - evaluacionId
+        - ordenServicioId
+        - riesgoDisminuyo
+        - estadoPlanTrabajo
+        - resumenPresupuesto
+      properties:
+        evaluacionId:
           type: string
           format: uuid
-        razonSocial:
+        ordenServicioId:
           type: string
-          example: Textiles S.A.
-        vigencia:
-          type: integer
-          example: 2026
-        presupuestoAnual:
-          type: number
-          format: double
-          example: 20000000
-        saldoComprometido:
-          type: number
-          format: double
-          example: 7000000
-        saldoEjecutado:
-          type: number
-          format: double
-          example: 5000000
-        saldoDisponible:
-          type: number
-          format: double
-          example: 8000000
+          format: uuid
+        riesgoDisminuyo:
+          type: boolean
+          example: false
+        estadoPlanTrabajo:
+          type: string
+          enum: [EN_PLANEACION, CERRADO]
+          description: CERRADO si el riesgo disminuyó; EN_PLANEACION si se ejecuta reajuste de plan (RN-07)
+          example: EN_PLANEACION
+        resumenPresupuesto:
+          $ref: '#/components/schemas/ResumenPresupuesto'
 
-    ErrorNegocio:
+    ErrorNegocioRFC7807:
       type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - instance
+        - codigoRegla
+        - error
+        - timestamp
       properties:
+        type:
+          type: string
+          format: uri
+          example: https://api.sura.com/arl/errores/saldo-insuficiente
+        title:
+          type: string
+          example: Regla de negocio presupuestal infringida
+        status:
+          type: integer
+          example: 422
+        detail:
+          type: string
+          example: El valor de la Orden de servicio supera el Saldo disponible actual de la Empresa afiliada.
+        instance:
+          type: string
+          example: /api/v1/planes-trabajo/550e8400-e29b-41d4-a716-446655440000/ordenes-servicio
         codigoRegla:
           type: string
           example: RN-01
         error:
           type: string
           example: SALDO_INSUFICIENTE
-        mensaje:
-          type: string
-          example: El valor de la Orden de servicio supera el Saldo disponible actual de la Empresa afiliada.
         timestamp:
           type: string
           format: date-time
-          example: '2026-11-20T19:05:00-05:00'
+          example: '2026-11-22T11:30:00-05:00'
