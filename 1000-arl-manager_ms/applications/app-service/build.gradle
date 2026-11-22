@@ -1,0 +1,7 @@
+apply plugin: 'org.springframework.boot'
+
+dependencies {
+    implementation project(':infrastructure:entry-points')
+    implementation project(':infrastructure:driven-adapters')
+    implementation 'org.springframework.boot:spring-boot-starter:3.3.0'
+}
