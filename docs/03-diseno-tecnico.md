@@ -28,7 +28,7 @@ Las tablas reflejan fielmente el modelo de dominio, respetan los nombres oficial
 - `PlanTrabajo` (1) ── (N) `OrdenServicio` *(Unidad indivisible)*
 - `OrdenServicio` (1) ── (0..1) `EvaluacionRiesgo`
 
-### Esquema Físico (PostgreSQL)
+### Esquema Físico sobre entidades críticas de negocio (PostgreSQL)
 Las reglas de negocio limitantes (`RN-01` y `CB-04`) se blindan mediante restricciones `CHECK` físicas.
 
 ```sql
@@ -109,7 +109,7 @@ stateDiagram-v2
 
 ## 4. Idempotencia y eventos de dominio
 - **Idempotencia (CB-01):** Todas las transacciones de modificación (crear, ejecutar o cancelar órdenes) exigirán un header HTTP `X-Idempotency-Key` válido. Si la llave ya existe en la tabla de idempotencia, se retorna el éxito guardado previamente sin duplicar movimientos.
-- **Integración asíncrona:** Se implementará el patrón `Transactional Outbox`. En la misma transacción de la base de datos donde se mueve el dinero, se guarda un registro del evento. Un proceso reactivo leerá esta tabla y publicará en **RabbitMQ** (vía `Reactive Commons`) los eventos: **PresupuestoReservado**, **PresupuestoConsumido** o **PresupuestoLiberado**.
+- **Integración asíncrona:** Se implementará el patrón `Transactional Outbox` usando `outbox_event`. En la misma transacción de la base de datos donde se mueve el dinero, se guarda un registro del evento. Un proceso reactivo leerá esta tabla y publicará en **RabbitMQ** (vía `Reactive Commons`) los eventos: **PresupuestoReservado**, **PresupuestoConsumido** o **PresupuestoLiberado**.
 
 ---
 
