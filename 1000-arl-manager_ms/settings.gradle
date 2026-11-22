@@ -1,7 +1,9 @@
 rootProject.name = 'arl-manager'
 
-include 'domain:model'
-include 'domain:usecase'
-include 'infrastructure:entry-points'
-include 'infrastructure:driven-adapters'
-include 'applications:app-service'
+include 'model', 'usecase', 'r2dbc-postgresql', 'reactive-web', 'app-service'
+
+project(':model').projectDir = file('domain/model')
+project(':usecase').projectDir = file('domain/usecase')
+project(':r2dbc-postgresql').projectDir = file('infrastructure/driven-adapters/r2dbc-postgresql')
+project(':reactive-web').projectDir = file('infrastructure/entry-points/reactive-web')
+project(':app-service').projectDir = file('applications/app-service')

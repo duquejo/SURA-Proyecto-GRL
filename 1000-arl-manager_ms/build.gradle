@@ -13,65 +13,67 @@ allprojects {
 }
 
 subprojects {
-    apply plugin: 'java'
-    apply plugin: 'jacoco'
-    apply plugin: 'com.diffplug.spotless'
+    if (childProjects.isEmpty()) {
+        apply plugin: 'java'
+        apply plugin: 'jacoco'
+        apply plugin: 'com.diffplug.spotless'
 
-    java {
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(21)
-        }
-    }
-
-    spotless {
         java {
-            target fileTree('.') {
-                include '**/*.java'
-                exclude '**/build/**', '**/build-*/**'
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(21)
             }
-            toggleOffOn()
-            importOrder()
-            removeUnusedImports()
-            palantirJavaFormat()
-            trimTrailingWhitespace()
-            endWithNewline()
-            formatAnnotations()
         }
-    }
 
-    tasks.withType(JavaCompile).configureEach {
-        options.encoding = 'UTF-8'
-    }
-
-    tasks.withType(Test).configureEach {
-        useJUnitPlatform()
-    }
-
-    dependencies {
-        testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
-        testImplementation 'org.assertj:assertj-core:3.25.3'
-        testImplementation 'org.mockito:mockito-junit-jupiter:5.12.0'
-    }
-
-    jacocoTestReport {
-        dependsOn test
-        reports {
-            xml.required = true
-            html.required = true
+        spotless {
+            java {
+                target fileTree('.') {
+                    include '**/*.java'
+                    exclude '**/build/**', '**/build-*/**'
+                }
+                toggleOffOn()
+                importOrder()
+                removeUnusedImports()
+                palantirJavaFormat()
+                trimTrailingWhitespace()
+                endWithNewline()
+                formatAnnotations()
+            }
         }
-    }
 
-    jacocoTestCoverageVerification {
-        violationRules {
-            rule {
-                limit {
-                    minimum = 0.80
+        tasks.withType(JavaCompile).configureEach {
+            options.encoding = 'UTF-8'
+        }
+
+        tasks.withType(Test).configureEach {
+            useJUnitPlatform()
+        }
+
+        dependencies {
+            testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+            testImplementation 'org.assertj:assertj-core:3.25.3'
+            testImplementation 'org.mockito:mockito-junit-jupiter:5.12.0'
+        }
+
+        jacocoTestReport {
+            dependsOn test
+            reports {
+                xml.required = true
+                html.required = true
+            }
+        }
+
+        jacocoTestCoverageVerification {
+            violationRules {
+                rule {
+                    limit {
+                        minimum = 0.80
+                    }
                 }
             }
         }
-    }
 
-    tasks.named('check') {
-        dependsOn 'spotlessCheck', 'jacocoTestCoverageVerification'
+        tasks.named('check') {
+            dependsOn 'spotlessCheck', 'jacocoTestCoverageVerification'
+        }
     }
 }

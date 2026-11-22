@@ -1,4 +1,4 @@
-package com.sura.arlmanager.domain.usecase.port;
+package com.sura.arlmanager.domain.model.port;
 
 import java.util.function.Supplier;
 import reactor.core.publisher.Mono;

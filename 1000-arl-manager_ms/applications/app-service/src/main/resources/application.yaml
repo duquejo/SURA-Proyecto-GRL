@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: arl-manager-ms
+  r2dbc:
+    url: "${SPRING_R2DBC_URL:r2dbc:postgresql://localhost:5432/arl_presupuesto}"
+    username: "${SPRING_R2DBC_USERNAME:postgres}"
+    password: "${SPRING_R2DBC_PASSWORD:postgres}"
+  flyway:
+    url: "${SPRING_FLYWAY_URL:jdbc:postgresql://localhost:5432/arl_presupuesto}"
+    user: "${SPRING_FLYWAY_USER:postgres}"
+    password: "${SPRING_FLYWAY_PASSWORD:postgres}"
+    locations: classpath:db/migration
+
+server:
+  port: 8080
