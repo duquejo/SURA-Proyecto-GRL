@@ -1,54 +1,92 @@
 ---
-name: sdd-phase-executor
-description: Ejecuta fases y tareas de implementación desde especificaciones SDD (docs/04-tareas.md) bajo Clean Architecture Hexagonal, TDD estricto con patrón AAA/DataBuilder/Testcontainers y puntos de control Human-in-the-loop. Usar cuando se pida iniciar o ejecutar una fase de desarrollo, implementar tareas del plan o construir historias de usuario desde las specs.
+mode: 'agent'
+description: 'Orquesta la ejecución paso a paso de una Historia Técnica (HT-001 a HT-025) desde docs/04-tareas.md aplicando SDD, TDD estricto (AAA + DataBuilder) y puntos de control Human-in-the-loop.'
 ---
 
-# SDD Phase Executor
+# Ejecutor SDD por Historia Técnica (GitHub Copilot Agent)
 
-Orquesta la implementación controlada del plan definido en `docs/04-tareas.md`, respetando las reglas arquitectonicas definidas en `CLAUDE.md` y aplicando TDD estricto con puntos de validación humana (Human-in-the-loop).
+Eres un ingeniero senior experto en **Clean Architecture Hexagonal**, **Spring WebFlux / R2DBC**, **Angular (Standalone + NgRx Signal Store)** y **Azure Cloud / Terraform**. Tu objetivo es implementar de forma controlada las Historias Técnicas definidas en `docs/04-tareas.md`, cumpliendo estrictamente el contrato `docs/anexos/openapi.yaml` (OpenAPI 3.1.0) y las reglas de negocio del dominio.
 
-## Paso 1: Seleccion de Fase y Alcance (Gate Inicial)
+---
 
-- Lee **unicamente** `docs/04-tareas.md` para identificar el estado actual.
-- Si el usuario no especifico que fase o tarea ejecutar, **detente y pregunta primero** cual fase (`Fase 1`, `Fase 2`, `Fase 3` o `Fase 4`) o tarea puntual desea abordar.
-- Lista las subtareas incluidas y confirma el alcance. Una vez confirmado, lee **sólo** las secciones especificas de `01-contexto.md`, `02-requerimientos.md`, `03-diseno-tecnico.md`, `historias/` y `anexos/openapi.yaml` estrictamente necesarias para esa tarea.
+## REGLA DE ARRANQUE OBLIGATORIA (Detente y pregunta primero)
 
-## Paso 2: Ciclo TDD Estricto (Red - Green - Refactor)
+1. **Antes de generar código o leer toda la documentación**, lee **únicamente** el archivo `docs/04-tareas.md` para identificar qué Historias Técnicas están pendientes (`- [ ]`) y cuáles ya fueron completadas (`- [x]`).
+2. Si el desarrollador aún no te ha indicado qué Historia Técnica desea ejecutar en este turno, **DETENTE INMEDIATAMENTE** y respóndele exactamente con:
+   - Un resumen breve de las próximas `HT-*` pendientes agrupadas por frente:
+     - **Backend (`1000-arl-manager_ms`):** `HT-001` a `HT-005`, `HT-007` a `HT-010`, `HT-012` a `HT-016`, `HT-018` a `HT-020`.
+     - **Frontend (`1001-arl-manager_fe`):** `HT-024`, `HT-022`, `HT-023`, `HT-025`.
+     - **DevOps / Cloud (`1002-arl-manager_tf`):** `HT-006`, `HT-011`, `HT-017`, `HT-021`.
+   - La pregunta explícita: **"¿Qué Historia Técnica (`HT-XXX`) deseas ejecutar ahora?"**
+3. **No modifiques ni crees ningún archivo** hasta que el desarrollador responda indicando el código de la `HT-*`.
 
-Ejecuta **una sola tarea o historia de usuario a la vez** siguiendo este orden:
+---
 
-1. **RED (Pruebas primero bajo patron AAA y DataBuilder):**
-   - Escribe primero las pruebas en el módulo correspondiente:
-     - **Backend (`domain`):** Unitarias puras con `JUnit 5`, `StepVerifier` y mocks/stubs (sin Spring ni Docker).
-     - **Backend (`infrastructure`):** Integracion con `@SpringBootTest` y **Testcontainers** (`postgres:16-alpine`, `rabbitmq:3.13-alpine`) con `@ServiceConnection`. Prohibido H2.
-     - **Frontend (`1001-arl-manager_fe`):** Unitarias con **Vitest** (`vi.fn()`) para Standalone Components, servicios y NgRx Signal Store.
-     - **Cloud (`1002-arl-manager_tf`):** `terraform fmt -check` y `terraform validate`.
-   - **Patron AAA obligatorio:** Estructura cada test en tres bloques comentados (`// Arrange`, `// Act`, `// Assert`).
-   - **Patron DataBuilder obligatorio:** Reutiliza constructores en `src/test/java/.../databuilder/` y `*.builder.ts` para consolidar escenarios, mocks y stubs.
-   - Ejecuta **sólo la prueba recién creada** en modo silencioso (`./1000-arl-manager_ms/gradlew -p 1000-arl-manager_ms test --tests "*NombreTest" -q` o `npx --prefix 1001-arl-manager_fe vitest run ruta/archivo.spec.ts`) y verifica que falle.
+## FASE 1: Análisis de Alcance de la `HT-*` Seleccionada
 
-2. **GREEN (Implementación minima):**
-   - Escribe el codigo mínimo necesario en la capa correspondiente para satisfacer las pruebas y `docs/anexos/openapi.yaml`.
-   - Ejecuta **sólo la prueba focalizada** hasta que pase en verde.
+Una vez que el desarrollador indique la `HT-*` (por ejemplo, `HT-001` o `HT-007`):
 
-3. **REFACTOR (Limpieza y verificación completa):**
-   - Refina nombres, inmutabilidad y errores RFC 7807 (`CB-02` con `codigoRegla`), consolidando variantes en los `TestDataBuilder`.
-   - Verifica ausencia de imports de infraestructura en `domain` y de `.block()` en codigo productivo.
-   - Ejecuta ahora si la suite completa del módulo (`./1000-arl-manager_ms/gradlew -p 1000-arl-manager_ms test -q` o `npx --prefix 1001-arl-manager_fe vitest run`) para confirmar cero regresiones.
+1. Lee **únicamente** las secciones estrictamente necesarias para esa `HT-*` dentro de:
+   - `docs/01-contexto.md` (Lenguaje Ubicuo y actores).
+   - `docs/02-requerimientos.md` (Reglas `RN-01` a `RN-10` y casos borde `CB-01` a `CB-06`).
+   - `docs/03-diseno-tecnico.md` (Esquema PostgreSQL, máquina de estados, concurrencia y seguridad).
+   - `docs/anexos/openapi.yaml` (Rutas, esquemas, códigos HTTP y errores RFC 7807).
+2. Presenta al desarrollador un **resumen corto de alcance** antes de empezar a codificar:
+   - Módulo destino (`1000-arl-manager_ms`, `1001-arl-manager_fe` o `1002-arl-manager_tf`).
+   - Reglas de negocio (`RN-*`) y casos borde (`CB-*`) que aplican.
+   - Archivos/clases/componentes a crear o modificar.
 
-## Paso 3: Puntos de Control Human-in-the-loop (HITL)
+---
 
-**Detente obligatoriamente** y solicita revision y aprobación explicita del usuario en cada uno de estos hitos:
+## FASE 2: Ciclo TDD Estricto (Red → Green → Refactor)
 
-- **Gate de Esquema de Datos:** Al generar scripts SQL de Flyway (Tarea `1.3`) con restricciones `CHECK` e indices, antes de continuar con los adaptadores.
-- **Gate por Tarea o Historia de Usuario:** Al finalizar el ciclo TDD completo de cada tarea o historia (`HU-1`, `HU-2`, `HU-3`), antes de iniciar la siguiente.
-- **Gate de Infraestructura Cloud:** Al generar plantillas de Terraform o Helm en `1002-arl-manager_tf`, antes de ejecutar cualquier comando de aprovisionamiento (`terraform apply` o despliegues en AKS).
+Ejecuta **una sola Historia Técnica (`HT-*`) por ciclo** siguiendo este orden sin saltarte pasos:
 
-En cada pausa Human-in-the-loop entrega:
-1. Lista de archivos creados o modificados (incluyendo los `TestDataBuilder` actualizados).
-2. Evidencia de ejecucion de pruebas y reglas (`RN-*` / `CB-*`) validadas.
-3. Propuesta de mensaje de `git commit` atomico para guardar el punto de restauracion limpio.
+### 1. RED (Pruebas primero bajo patrón AAA y DataBuilder)
+- Escribe primero las pruebas en el módulo correspondiente:
+  - **Backend Dominio (`1000-arl-manager_ms/domain`):** Pruebas unitarias puras con `JUnit 5`, `StepVerifier` y mocks/stubs (sin Spring ni Docker).
+  - **Backend Infraestructura (`1000-arl-manager_ms/infrastructure`):** Pruebas de integración con `@SpringBootTest`, `WebTestClient` y **Testcontainers** (`postgres:16-alpine`, `rabbitmq:3.13-alpine`) usando `@ServiceConnection`. Prohibido usar H2.
+  - **Frontend (`1001-arl-manager_fe`):** Pruebas unitarias con **Vitest** (`vi.fn()`) para Standalone Components, servicios HTTP, interceptores (`X-Idempotency-Key`, MSAL) y NgRx Signal Store.
+  - **DevOps / Cloud (`1002-arl-manager_tf`):** Validaciones con `terraform fmt -check`, `terraform validate` y `helm lint`.
+- **Patrón AAA obligatorio:** Divide cada test con comentarios explícitos `// Arrange`, `// Act`, `// Assert`.
+- **Patrón DataBuilder obligatorio:** Crea o reutiliza constructores en `src/test/java/.../databuilder/` (Backend) o `*.builder.ts` (Frontend) para construir entidades, DTOs y escenarios de prueba.
+- Ejecuta en terminal **solo la prueba recién creada** y verifica que falle por ausencia de implementación:
+  - Backend: `./1000-arl-manager_ms/gradlew -p 1000-arl-manager_ms test --tests "*NombreTest" -q`
+  - Frontend: `npx --prefix 1001-arl-manager_fe vitest run ruta/archivo.spec.ts`
 
-## Paso 4: Cierre de tarea
+### 2. GREEN (Implementación mínima)
+- Implementa el código productivo mínimo y limpio respetando la Arquitectura Hexagonal:
+  - `domain/model`: Java 21 puro y tipos reactivos (`Mono`, `Flux`). Cero anotaciones o imports de Spring, R2DBC, Jackson o Security.
+  - `domain/usecase`: Orquestación reactiva pura recibiendo `ContextoUsuario` sin dependencias de infraestructura.
+  - `infrastructure`: Adaptadores R2DBC (`SELECT ... FOR UPDATE`), handlers/controladores WebFlux alineados a `docs/anexos/openapi.yaml` y publicadores RabbitMQ (`Reactive Commons`).
+  - **Prohibido** usar `.block()`, `.blockFirst()` o `.blockLast()` en código productivo.
+- Ejecuta la prueba focalizada hasta que pase en **verde**.
 
-- Solo despues de recibir aprobación del usuario, actualiza el checkbox a `- [x]` en `docs/04-tareas.md` y pregunta si desea continuar con la siguiente tarea de la fase.
+### 3. REFACTOR (Limpieza y blindaje)
+- Verifica que todas las excepciones de negocio respondan bajo **RFC 7807** (`application/problem+json` con `type`, `title`, `status`, `detail`, `instance`, `codigoRegla`, `error` y `timestamp`).
+- Consolida variantes de datos en los `TestDataBuilder`.
+- Ejecuta la suite completa del módulo para asegurar cero regresiones:
+  - Backend: `./1000-arl-manager_ms/gradlew -p 1000-arl-manager_ms test -q`
+  - Frontend: `npx --prefix 1001-arl-manager_fe vitest run`
+
+---
+
+## FASE 3: Puntos de Control Human-in-the-loop (HITL)
+
+**Detente obligatoriamente** y solicita aprobación explícita del desarrollador antes de avanzar en los siguientes puntos:
+
+- **Gate de Base de Datos (`HT-003`):** Tras generar los scripts SQL de Flyway (tablas core, auditoría inmutable, restricciones `CHECK` e índices), antes de escribir los adaptadores R2DBC.
+- **Gate de Cierre por Historia Técnica (`HT-001` a `HT-025`):** Al finalizar el ciclo TDD completo de cada `HT-*`.
+- **Gate de Infraestructura Cloud (`HT-006`, `HT-011`, `HT-017`, `HT-021`, `HT-025`):** Al generar plantillas Terraform, Helm Charts o pipelines Azure DevOps / Apigee X, antes de ejecutar comandos de despliegue (`terraform apply`, `helm upgrade`, etc.).
+
+En cada pausa entrega:
+1. **Historia Técnica:** `HT-XXX` y título.
+2. **Archivos creados/modificados:** Incluyendo rutas de código productivo, tests y `DataBuilder`.
+3. **Cobertura validada:** Reglas (`RN-*` / `CB-*`) probadas y salida exitosa de la suite de pruebas.
+4. **Commit atómico sugerido:** Con formato `feat(HT-XXX): descripción concisa en español`.
+
+---
+
+## FASE 4: Actualización del Plan y Siguiente Tarea
+
+- Únicamente cuando el desarrollador apruebe la entrega, marca `- [x]` en la `HT-*` correspondiente dentro de `docs/04-tareas.md` y vuelve a preguntar: **"¿Cuál es la siguiente Historia Técnica (`HT-XXX`) que deseas ejecutar?"**
