@@ -50,6 +50,7 @@ Ejecuta **una sola Historia Técnica (`HT-*`) por ciclo** siguiendo este orden s
   - **Frontend (`1001-arl-manager_fe`):** Pruebas unitarias con **Vitest** (`vi.fn()`) para Standalone Components, servicios HTTP, interceptores (`X-Idempotency-Key`, MSAL) y NgRx Signal Store.
   - **DevOps / Cloud (`1002-arl-manager_tf`):** Validaciones con `terraform fmt -check`, `terraform validate` y `helm lint`.
 - **Patrón AAA obligatorio:** Divide cada test con comentarios explícitos `// Arrange`, `// Act`, `// Assert`.
+- **Atomicidad de pruebas unitarias:** Cada test debe verificar un solo escenario/comportamiento y no incluir condicionales (`if/else`, operador ternario u otros desvíos de flujo). Si hay caminos o resultados distintos, crea tests independientes para cada caso.
 - **Patrón DataBuilder obligatorio:** Crea o reutiliza constructores en `src/test/java/.../databuilder/` (Backend) o `*.builder.ts` (Frontend) para construir entidades, DTOs y escenarios de prueba.
 - Ejecuta en terminal **solo la prueba recién creada** y verifica que falle por ausencia de implementación:
   - Backend: `./1000-arl-manager_ms/gradlew -p 1000-arl-manager_ms test --tests "*NombreTest" -q`
