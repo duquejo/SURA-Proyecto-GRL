@@ -16,7 +16,7 @@ applyTo: "1000-arl-manager_ms/**"
 4. **Aislamiento RBAC (`RN-09`):** En `HU-2` validar `orden.prestadorId == contexto.usuarioId`; en `HU-3` filtrar obligatoriamente en SQL por `grupo_prevencion_id`.
 
 ## Pruebas y Comandos
-- **Unitarias (`domain`):** JUnit 5 + `StepVerifier` + mocks/stubs. Sin contexto Spring ni Docker.
+- **Unitarias (`domain`):** JUnit 5 + Mockito (`mockito-junit-jupiter`, `@ExtendWith(MockitoExtension.class)`, `@Mock`, `@InjectMocks`, `when` y `verify`) y `StepVerifier` para flujos reactivos. Sin contexto Spring ni Docker; simula puertos y gateways con mocks en lugar de stubs manuales repetitivos.
 - **Integración (`infrastructure`):** `@SpringBootTest` + **Testcontainers** (`postgres:16-alpine` y `rabbitmq:3.13-alpine`) con `@ServiceConnection`. Prohibido usar H2.
 - **Estándar:** Patrón AAA (`// Arrange`, `// Act`, `// Assert`) y `TestDataBuilder` en `src/test/java/.../databuilder/`.
 - **Ejecución focalizada:** `./gradlew -p 1000-arl-manager_ms test --tests "*NombreTest" -q`

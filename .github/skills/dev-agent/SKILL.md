@@ -1,6 +1,6 @@
 ---
-name: dev-agent
-description: 'Ejecuta Historias Técnicas (HT-001 a HT-025) desde docs/04-tareas.md bajo Clean Architecture Hexagonal y TDD estricto.'
+name: 'dev-agent'
+description: 'Orquesta la ejecución paso a paso de una Historia Técnica (HT-001 a HT-025) desde docs/04-tareas.md aplicando SDD, TDD estricto (estructura espejo 1:1, JUnit 5/Mockito, AAA, DataBuilder), tipado explícito, Spotless/Lint y puntos de control Human-in-the-loop.'
 ---
 
 # Ejecutor SDD por Historia Técnica (GitHub Copilot Agent)
@@ -34,7 +34,7 @@ Una vez que el desarrollador indique la `HT-*` (por ejemplo, `HT-001` o `HT-007`
 2. Presenta al desarrollador un **resumen corto de alcance** antes de empezar a codificar:
    - Módulo destino (`1000-arl-manager_ms`, `1001-arl-manager_fe` o `1002-arl-manager_tf`).
    - Reglas de negocio (`RN-*`) y casos borde (`CB-*`) que aplican.
-   - Archivos/clases/componentes a crear o modificar.
+   - Archivos/clases/componentes productivos y sus pruebas espejo 1:1 a crear o modificar.
 
 ---
 
@@ -42,10 +42,11 @@ Una vez que el desarrollador indique la `HT-*` (por ejemplo, `HT-001` o `HT-007`
 
 Ejecuta **una sola Historia Técnica (`HT-*`) por ciclo** siguiendo este orden sin saltarte pasos:
 
-### 1. RED (Pruebas primero bajo patrón AAA y DataBuilder)
+### 1. RED (Pruebas primero bajo estructura espejo 1:1, JUnit 5 + Mockito, patrón AAA y DataBuilder)
+- **Estructura espejo 1:1 obligatoria (`src/main` ↔ `src/test`):** Cada clase, caso de uso, adaptador o componente productivo debe tener su propio archivo de prueba replicando exactamente la ruta de directorios y paquetes (`src/main/java/<paquete>/Feature.java` → `src/test/java/<paquete>/FeatureTest.java` en Backend; `feature.component.ts` → `feature.component.spec.ts` en Frontend). **Está estrictamente prohibido** agrupar pruebas de múltiples clases en archivos monolíticos (como `DomainModelTest.java` o `UseCaseTest.java`).
 - Escribe primero las pruebas en el módulo correspondiente:
-  - **Backend Dominio (`1000-arl-manager_ms/domain`):** Pruebas unitarias puras con `JUnit 5`, `StepVerifier` y mocks/stubs (sin Spring ni Docker).
-  - **Backend Infraestructura (`1000-arl-manager_ms/infrastructure`):** Pruebas de integración con `@SpringBootTest`, `WebTestClient` y **Testcontainers** (`postgres:16-alpine`, `rabbitmq:3.13-alpine`) usando `@ServiceConnection`. Prohibido usar H2.
+  - **Backend Unitarias (`1000-arl-manager_ms` - `domain` y clases aisladas):** Pruebas unitarias puras con **JUnit 5**, **Mockito** (`@ExtendWith(MockitoExtension.class)`, `@Mock`, `@InjectMocks`, `Mockito.when`, `Mockito.verify`) y **`StepVerifier`** para flujos reactivos (sin levantar contexto Spring ni Docker; utiliza `@Mock` sobre los *gateways*/puertos en lugar de implementar *stubs* manuales repetitivos).
+  - **Backend Integración (`1000-arl-manager_ms/infrastructure`):** Pruebas de integración con `@SpringBootTest`, `WebTestClient` y **Testcontainers** (`postgres:16-alpine`, `rabbitmq:3.13-alpine`) usando `@ServiceConnection`. Prohibido usar H2.
   - **Frontend (`1001-arl-manager_fe`):** Pruebas unitarias con **Vitest** (`vi.fn()`) para Standalone Components, servicios HTTP, interceptores (`X-Idempotency-Key`, MSAL) y NgRx Signal Store.
   - **DevOps / Cloud (`1002-arl-manager_tf`):** Validaciones con `terraform fmt -check`, `terraform validate` y `helm lint`.
 - **Patrón AAA obligatorio:** Divide cada test con comentarios explícitos `// Arrange`, `// Act`, `// Assert`.
@@ -54,7 +55,8 @@ Ejecuta **una sola Historia Técnica (`HT-*`) por ciclo** siguiendo este orden s
   - Backend: `./1000-arl-manager_ms/gradlew -p 1000-arl-manager_ms test --tests "*NombreTest" -q`
   - Frontend: `npx --prefix 1001-arl-manager_fe vitest run ruta/archivo.spec.ts`
 
-### 2. GREEN (Implementación mínima)
+### 2. GREEN (Implementación mínima y tipado explícito)
+- **Tipado explícito obligatorio (Prohibido `var`):** Declara siempre el tipo explícito de cada variable tanto en código productivo como en pruebas (ej. `BigDecimal saldoCalculado = ...`, `Mono<PresupuestoAnual> resultado = ...`). **Está estrictamente prohibido** el uso de `var` en Java y de `var` o `any` en TypeScript.
 - Implementa el código productivo mínimo y limpio respetando la Arquitectura Hexagonal:
   - `domain/model`: Java 21 puro y tipos reactivos (`Mono`, `Flux`). Cero anotaciones o imports de Spring, R2DBC, Jackson o Security.
   - `domain/usecase`: Orquestación reactiva pura recibiendo `ContextoUsuario` sin dependencias de infraestructura.
@@ -62,12 +64,14 @@ Ejecuta **una sola Historia Técnica (`HT-*`) por ciclo** siguiendo este orden s
   - **Prohibido** usar `.block()`, `.blockFirst()` o `.blockLast()` en código productivo.
 - Ejecuta la prueba focalizada hasta que pase en **verde**.
 
-### 3. REFACTOR (Limpieza y blindaje)
+### 3. REFACTOR (Limpieza, Calidad y Verificación)
 - Verifica que todas las excepciones de negocio respondan bajo **RFC 7807** (`application/problem+json` con `type`, `title`, `status`, `detail`, `instance`, `codigoRegla`, `error` y `timestamp`).
-- Consolida variantes de datos en los `TestDataBuilder`.
-- Ejecuta la suite completa del módulo para asegurar cero regresiones:
-  - Backend: `./1000-arl-manager_ms/gradlew -p 1000-arl-manager_ms test -q`
-  - Frontend: `npx --prefix 1001-arl-manager_fe vitest run`
+- Consolida variantes de datos en los `TestDataBuilder` y verifica ausencia de `var` en Java, de imports de infraestructura en `domain` y de `.block()` en código productivo.
+- Ejecuta los controles automáticos de calidad del proyecto antes de solicitar revisión:
+  - Backend: `./1000-arl-manager_ms/gradlew -p 1000-arl-manager_ms spotlessApply check -q` (Verifica formato Spotless, pruebas unitarias/integración y cobertura JaCoCo).
+  - Frontend: `npx --prefix 1001-arl-manager_fe vitest run && npm --prefix 1001-arl-manager_fe run lint` (Verifica pruebas Vitest y ESLint estricto).
+  - DevOps / Cloud: `terraform fmt -check -recursive && terraform validate`
+- Si alguna verificación falla, corrige el código y repite la ejecución hasta obtener cero regresiones y formato impecable.
 
 ---
 
@@ -76,14 +80,15 @@ Ejecuta **una sola Historia Técnica (`HT-*`) por ciclo** siguiendo este orden s
 **Detente obligatoriamente** y solicita aprobación explícita del desarrollador antes de avanzar en los siguientes puntos:
 
 - **Gate de Base de Datos (`HT-003`):** Tras generar los scripts SQL de Flyway (tablas core, auditoría inmutable, restricciones `CHECK` e índices), antes de escribir los adaptadores R2DBC.
-- **Gate de Cierre por Historia Técnica (`HT-001` a `HT-025`):** Al finalizar el ciclo TDD completo de cada `HT-*`.
+- **Gate de Cierre por Historia Técnica (`HT-001` a `HT-025`):** Al finalizar el ciclo TDD completo y pasar los controles automáticos (`spotlessCheck`, `lint`, `validate`) de cada `HT-*`.
 - **Gate de Infraestructura Cloud (`HT-006`, `HT-011`, `HT-017`, `HT-021`, `HT-025`):** Al generar plantillas Terraform, Helm Charts o pipelines Azure DevOps / Apigee X, antes de ejecutar comandos de despliegue (`terraform apply`, `helm upgrade`, etc.).
 
 En cada pausa entrega:
 1. **Historia Técnica:** `HT-XXX` y título.
-2. **Archivos creados/modificados:** Incluyendo rutas de código productivo, tests y `DataBuilder`.
+2. **Archivos creados/modificados:** Incluyendo rutas de código productivo, pruebas espejo 1:1 y `DataBuilder`.
 3. **Cobertura validada:** Reglas (`RN-*` / `CB-*`) probadas y salida exitosa de la suite de pruebas.
-4. **Commit atómico sugerido:** Con formato `feat(HT-XXX): descripción concisa en español`.
+4. **Controles de calidad:** Confirmación de ejecución exitosa de `spotlessApply check`, `lint` o `terraform validate`.
+5. **Commit atómico sugerido:** Con formato `feat(HT-XXX): descripción concisa en español` o `fix(HT-XXX): descripción concisa en español`.
 
 ---
 
