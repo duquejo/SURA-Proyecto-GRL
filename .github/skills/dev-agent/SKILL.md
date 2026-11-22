@@ -1,6 +1,6 @@
 ---
-mode: 'agent'
-description: 'Orquesta la ejecución paso a paso de una Historia Técnica (HT-001 a HT-025) desde docs/04-tareas.md aplicando SDD, TDD estricto (AAA + DataBuilder) y puntos de control Human-in-the-loop.'
+name: dev-agent
+description: 'Ejecuta Historias Técnicas (HT-001 a HT-025) desde docs/04-tareas.md bajo Clean Architecture Hexagonal y TDD estricto.'
 ---
 
 # Ejecutor SDD por Historia Técnica (GitHub Copilot Agent)
