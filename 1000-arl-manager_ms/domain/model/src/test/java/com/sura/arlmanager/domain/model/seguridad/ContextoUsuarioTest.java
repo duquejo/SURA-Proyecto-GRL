@@ -8,6 +8,18 @@ import org.junit.jupiter.api.Test;
 
 class ContextoUsuarioTest {
     @Test
+    void exponeElUsuarioComoNombreDelPrincipal() {
+        // Arrange
+        ContextoUsuario contexto = contextoUsuario();
+
+        // Act
+        String nombre = contexto.getName();
+
+        // Assert
+        assertThat(nombre).isEqualTo(contexto.usuarioId().toString());
+    }
+
+    @Test
     void rechazaGrupoDePrevencionNulo() {
         // Arrange
         ContextoUsuario contexto = contextoUsuario();
